@@ -8,66 +8,6 @@ ENERGY = 28
 POSSIBLE_CELLS = {"⛰": 39, "X": 9, "D": 3, "S": 1, "G": 1, ".": 91}
 MOVES = {"UP": (-1, 0), "DOWN": (1, 0), "LEFT": (0, -1), "RIGHT": (0, 1)}
 
-
-def get_neighbors(state):
-    neighbors = []
-    index = state.index("S")
-    row, col = divmod(index, 12)
-
-    for move_name, (dr, dc) in MOVES.items():
-        new_row = row + dr
-        new_col = col + dc
-        if new_row >= 0 and new_row <= 11 and new_col >= 0 and new_col <= 11:
-            new_state = list(state)
-            new_index = new_row * 3 + new_col
-            new_state[index], new_state[new_index] = (
-                new_state[new_index],
-                new_state[index],
-            )
-            neighbors.append((tuple(new_state), move_name))
-
-    return neighbors
-
-
-def prepare_solution(path, steps_taken, state):
-    solution = [(state, None)]
-    while state in path:
-        solution.append((path[state], steps_taken[state]))
-        state = path[state]
-
-    solution.reverse()
-    return solution
-
-
-def print_solution(solution):
-    for n, move in solution:
-        print(move if move is not None else "NONE")
-        for i in range(0, 9, 3):
-            print(n[i : i + 3])
-        print()
-
-
-def bfs(start_state):
-    queue = deque([start_state])
-    visited = set([start_state])
-    path = {}
-    steps_taken = {}
-    GOAL_STATE = initialize_goal(start_state)
-
-    while queue:
-        state = queue.popleft()
-        if state == GOAL_STATE:
-            return prepare_solution(path, steps_taken, state)
-        neighbors = get_neighbors(state)
-        for n, move in neighbors:
-            if n not in visited:
-                visited.add(n)
-                queue.append(n)
-                path[n] = state
-                steps_taken[n] = move
-    return None
-
-
 def add_energy(cell: str, energy: int):
     return energy + ENERGY_COSTS[cell]
 
@@ -81,12 +21,7 @@ def initialize_board() -> list:
     random.shuffle(board)
     return board
 
-
-def initialize_goal(board: list):
-    goal_board = ["." if cell == "D" or "G" else cell for cell in board]
-    return goal_board
-
-
+# Agent picks random moves from the moves it can do
 def random_agent(board: list, e: int) -> tuple[str, list]:
     moves_taken = []
     deliveries_done = 0
@@ -98,6 +33,7 @@ def random_agent(board: list, e: int) -> tuple[str, list]:
             12,
         )
 
+        # Create a dictionary containing each possible move, the cell it takes the agent to, and the index of the cell
         neighbor_cells = {}
         for move_name, (dr, dc) in MOVES.items():
             new_row = row + dr
@@ -110,6 +46,7 @@ def random_agent(board: list, e: int) -> tuple[str, list]:
             if board[new_index] == "G" and deliveries_done != 3:
                 continue
 
+            # Don't add the move if the cell it takes the agent to is a X
             if board[new_index] != "X":
                 if board[new_index] == "S":
                     neighbor_cells[move_name] = (".", new_index)
@@ -120,9 +57,11 @@ def random_agent(board: list, e: int) -> tuple[str, list]:
             # print(np.reshape(board, (12, 12)))
             return "Can no longer proceed", moves_taken
 
+        # Choose a move randomly out of all the possible moves
         chosen_move = random.choice(list(neighbor_cells.items()))
         moves_taken.append(chosen_move[0])
 
+        # Check if the cell the move takes the agent to is a delivery point, remove it, and increase the number of deliveries done.
         if chosen_move[1][0] == "D":
             board[chosen_move[1][1]] = "."
             deliveries_done += 1
@@ -136,11 +75,13 @@ def random_agent(board: list, e: int) -> tuple[str, list]:
     return "Energy ran out", moves_taken
 
 
+# Agent tries to go to the nearest delivery ppoint or goal, while attempting to avoid nmountains
 def reflex_agent(board: list, e: int) -> tuple[str, list]:
 
     moves_taken = []
     deliveries_done = 0
     agent = board.index("S")
+    # Find positions of delivery points and goal point
     deliver_point_indices = np.where(np.array(board) == "D")[0]
     goal_index = np.where(np.array(board) == "G")[0]
     goal_row, goal_col = divmod(goal_index, 12)
@@ -151,6 +92,7 @@ def reflex_agent(board: list, e: int) -> tuple[str, list]:
             12,
         )
 
+        # Create a dictionary containing all the moves, the cell it takes the agent to, the new cell index, and the new distances from the delivery points
         neighbor_cells = {}
         for move_name, (dr, dc) in MOVES.items():
             deliver_point_distances = []
@@ -158,13 +100,16 @@ def reflex_agent(board: list, e: int) -> tuple[str, list]:
             new_col = col + dc
             new_index = new_row * 12 + new_col
 
+            # Skip move if it takes the agent off the board
             if new_row < 0 or new_row > 11 or new_col < 0 or new_col > 11:
                 continue
 
+            # Skip move if the cell it takes the agent to is the goal cell and it hasn't finished the deliveries yet
             if board[new_index] == "G" and deliveries_done != 3:
                 continue
 
             if board[new_index] != "X":
+                # Calculate new distances to the delivery points based on the move
                 for index in deliver_point_indices:
                     d_row, d_col = divmod(index, 12)
                     deliver_point_distances.append(
@@ -184,10 +129,12 @@ def reflex_agent(board: list, e: int) -> tuple[str, list]:
                         deliver_point_distances,
                     )
 
+        # Check if the agent is stuck
         if neighbor_cells == {}:
             # print(np.reshape(board, (12, 12)))
             return "Can no longer proceed", moves_taken
 
+        # Check for ⛰ in the neighbouring cells and remove them if and only if the agent is left with at least one move
         cells = {}
         for move, tuple in neighbor_cells.items():
             cells[move] = tuple[0]
@@ -197,6 +144,7 @@ def reflex_agent(board: list, e: int) -> tuple[str, list]:
                 if cell == "⛰":
                     neighbor_cells.pop(move)
 
+        # Move the agent towards the nearest delivery point or to the goal if there are no delivery points left
         chosen_move = []
         if deliveries_done < 3:
             min_steps = 100000000000
@@ -218,6 +166,8 @@ def reflex_agent(board: list, e: int) -> tuple[str, list]:
 
         moves_taken.append(chosen_move[0])
 
+        # Check whether the chosen move takes the agent to a delivery point, remove it, calculate the indices of the remaining delivery points,
+        # and increase the number of deliveries done
         if chosen_move[1][0] == "D":
             board[chosen_move[1][1]] = "."
             deliver_point_indices = np.where(np.array(board) == "D")[0]
@@ -233,11 +183,6 @@ def reflex_agent(board: list, e: int) -> tuple[str, list]:
 
 
 if __name__ == "__main__":
-    # board = initialize_board()
-    # start = board.index("S")
-    # start_row, start_col = divmod(start, 12)
-    # goal_board = initialize_goal(board)
-
     ra_runs = []
     for _ in range(100):
         board = initialize_board()
