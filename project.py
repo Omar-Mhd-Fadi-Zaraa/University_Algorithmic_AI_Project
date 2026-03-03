@@ -148,7 +148,6 @@ def reflex_agent(board: list, e: int) -> tuple[str, list]:
         chosen_move = []
         if deliveries_done < 3:
             min_steps = 100000000000
-            nearest_delivery_points = {}
             for move, tuple in neighbor_cells.items():
                 if np.min(tuple[2]) < min_steps:
                     min_steps = np.min(tuple[2])

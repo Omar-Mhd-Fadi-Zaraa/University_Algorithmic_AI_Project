@@ -10,16 +10,12 @@ def place(symbol):
     grid[r][c] = symbol
     return (r, c)
 
+start_energy = 28
 start_pos = place(" S ")
 place(" G ")
 place(" D1"); place(" D2"); place(" D3")
 for _ in range(39): place(" M ")
 for _ in range(9): place(" X ")
-
-energy = 28
-Mov_cost = -1
-Moun_cost = -5
-D_cost = 2  
 
 def get_neighbors( r , c ,grid) :
     MOVES = {
@@ -45,9 +41,9 @@ def prepare_sol ( steps_taken ,parent , curr_l ) :
     return solution
 
 
-def bfs(E ,grid , s ) :
+def bfs(start_energy ,grid , s ) :
     D_collected = frozenset()
-    queue = deque([(s , E , D_collected)])
+    queue = deque([(s , start_energy , D_collected)])
     visited = {(s[0], s[1] , D_collected)}
     steps_taken = {}
     parent = {}
@@ -60,12 +56,12 @@ def bfs(E ,grid , s ) :
             neighbors = get_neighbors(r,c,grid)
 
             for (x,y) , move  in neighbors :
-                new_E = curr_E + (Moun_cost if grid[x][y] == " M " else Mov_cost)
+                new_E = curr_E + (-5 if grid[x][y] == " M " else -1)
                 new_D = curr_D 
 
                 if grid[x][y] in [" D1" , " D2" , " D3"] and grid[x][y] not in curr_D :
                     new_D = curr_D| {grid[x][y]}
-                    new_E += D_cost
+                    new_E += 2
 
                 if new_E >= 0:
                     new_state = (x, y, new_D)
@@ -85,7 +81,7 @@ def print_grid(grid):
 
 
 print_grid(grid)     
-result = bfs(energy, grid, start_pos)
+result = bfs( start_energy ,grid, start_pos)
 
 if result:
     rem_energy, path = result
